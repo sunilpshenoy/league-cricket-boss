@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>React Test</title>
+  <style>
+    body { margin: 0; background: #06080F; min-height: 100vh; display: flex; align-items: center; justify-content: center; font-family: system-ui; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+  <script>
+    try {
+      const { useState, useEffect } = React;
+
+      function App() {
+        const [status, setStatus] = useState('loading');
+        useEffect(() => {
+          setTimeout(() => setStatus('React 18 is working ✅'), 500);
+        }, []);
+        return React.createElement('div', {
+          style: { color: '#F59E0B', fontSize: 20, fontWeight: 700, textAlign: 'center', padding: 24 }
+        }, status);
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(React.createElement(App));
+    } catch(e) {
+      document.getElementById('root').innerHTML = '<div style="color:red;padding:24px;font-family:system-ui">ERROR: ' + e.message + '</div>';
+    }
+  </script>
+</body>
+</html>
