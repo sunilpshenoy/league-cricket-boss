@@ -120,50 +120,89 @@ function LCB_LiveMatch({code,uid,myTeamId,players}){
     googly:{label:"Googly",emoji:"\ud83c\udfb2",pace:false,skillReq:72,wicket:1.6,boundary:.7,dot:1.15,risk:{threshold:72,misfire:{boundary:1.8,wicket:.5}}},
     arm_ball:{label:"Arm Ball",emoji:"\u2197\ufe0f",pace:false,wicket:1.15,boundary:.85,dot:1.1,risk:{threshold:60,misfire:{boundary:1.2,wicket:.9}}}
   };
+  const SHOT_TYPES={
+    defensive:{label:"Defensive",emoji:"\ud83d\udee1\ufe0f",wicket:.5,boundary:.4,runBoost:.75,risk:null},
+    nudge:{label:"Nudge / Rotate",emoji:"\u2194\ufe0f",wicket:.75,boundary:.6,runBoost:.9,risk:null},
+    balanced:{label:"Balanced",emoji:"\u2696\ufe0f",wicket:1,boundary:1,runBoost:1,risk:null},
+    aggressive:{label:"Aggressive",emoji:"\ud83d\udcaa",wicket:1.3,boundary:1.5,runBoost:1.25,risk:{threshold:65,misfire:{wicket:1.7,boundary:1.9}}},
+    loft:{label:"Loft / Six Hit",emoji:"\ud83d\ude80",wicket:1.8,boundary:2.2,runBoost:1.55,risk:{threshold:70,misfire:{wicket:2.4,boundary:2.8}}}
+  };
+  function shotsAvailable(){return Object.entries(SHOT_TYPES).map(([k,v])=>({key:k,...v}))}
   function isSpinner(p){return g1.has(p?.name)}
   function deliveriesFor(bowler){const isSpin=isSpinner(bowler);return Object.entries(DELIVERIES).filter(([k,v])=>v.pace===!isSpin).filter(([k,v])=>!v.skillReq||bowler.bowl>=v.skillReq).map(([k,v])=>({key:k,...v}))}
   function bowlerPool(){
     const squad=getSquad(bowlingTeam).filter(p=>p.bowl>=52||p.role==="BOWL").filter(p=>!(bowlingInjuries&&bowlingInjuries[p.name]));
     const myOrders=match&&match.matchOrders||{};
     const impactName=myOrders[bowlingTeam]&&myOrders[bowlingTeam].impact;
+    let pool=squad;
     if(isSecondInnings&&impactName&&!squad.some(p=>p.name===impactName)){
       const impactPlayerObj=getSquad(bowlingTeam).find(p=>p.name===impactName)||Q[bowlingTeam]?.players?.find(p=>p.name===impactName);
-      if(impactPlayerObj)return[...squad,impactPlayerObj]
+      if(impactPlayerObj)pool=[...squad,impactPlayerObj]
     }
-    return squad
+    const bowlerOvers=inn.bowlerOvers||{};
+    const lastBowler=inn.lastOverBowler;
+    const eligible=pool.filter(p=>p.name!==lastBowler&&(bowlerOvers[p.name]||0)<4);
+    if(eligible.length)return eligible;
+    const noRepeat=pool.filter(p=>p.name!==lastBowler);
+    if(noRepeat.length)return noRepeat;
+    return pool
   }
-  function resolveBall(batter,bowler,intent,deliveryKey){
+  function resolveBall(batter,bowler,shotKey,deliveryKey){
     const batSkill=(batter?.bat||60)/100,bowlSkill=(bowler?.bowl||60)/100;
-    const intentMult=intent==="attack"?1.25:intent==="anchor"?.7:1;
-    let wicketMult=1,boundaryMult=1;
-    if(deliveryKey&&DELIVERIES[deliveryKey]){const d0=DELIVERIES[deliveryKey],misfire=d0.risk&&bowler.bowl<d0.risk.threshold;wicketMult=misfire?d0.risk.misfire.wicket:d0.wicket;boundaryMult=misfire?d0.risk.misfire.boundary:d0.boundary}
-    const wicketChance=Math.min(.35,(.015+bowlSkill*.08*(1/intentMult))*wicketMult);
+    let dWicket=1,dBoundary=1;
+    if(deliveryKey&&DELIVERIES[deliveryKey]){const d0=DELIVERIES[deliveryKey],misfire=d0.risk&&bowler.bowl<d0.risk.threshold;dWicket=misfire?d0.risk.misfire.wicket:d0.wicket;dBoundary=misfire?d0.risk.misfire.boundary:d0.boundary}
+    let sWicket=1,sBoundary=1,runBoost=1;
+    if(shotKey&&SHOT_TYPES[shotKey]){const s0=SHOT_TYPES[shotKey],smisfire=s0.risk&&(batter?.bat||60)<s0.risk.threshold;sWicket=smisfire?s0.risk.misfire.wicket:s0.wicket;sBoundary=smisfire?s0.risk.misfire.boundary:s0.boundary;runBoost=s0.runBoost}
+    const wicketMult=dWicket*sWicket,boundaryMult=dBoundary*sBoundary;
+    const wicketChance=Math.min(.35,(.015+bowlSkill*.08)*wicketMult);
     if(Math.random()<wicketChance)return{runs:0,r:"W"};
     const table=[0,0,1,1,1,1,2,2,3,4,4,4,6];
-    const power=batSkill*(1-bowlSkill*.6)*intentMult;
+    const power=batSkill*(1-bowlSkill*.6)*runBoost;
     const idx=Math.min(Math.floor(power*table.length*boundaryMult*(.7+Math.random()*.6)),table.length-1);
     const runs=table[Math.max(0,idx)];
     return{runs,r:runs===4?"4":runs===6?"6":runs===0?"\u00b7":String(runs)}
   }
-  async function resolveOver(){
+  async function resolveOneBallStep(){
     const battingSquad=getSquad(battingTeam);
     const bowlingSquad=bowlerPool();
     const myOrders=match.matchOrders||{};
     const battingOrderNames=(myOrders[battingTeam]&&myOrders[battingTeam].order)||battingSquad.map(p=>p.name);
     const impactName=myOrders[battingTeam]&&myOrders[battingTeam].impact;
     const effectiveOrder=isSecondInnings&&impactName&&!battingOrderNames.includes(impactName)?[...battingOrderNames,impactName]:battingOrderNames;
-    const availableOrder=effectiveOrder.filter(nm=>!(battingInjuries&&battingInjuries[nm]));
-    const curName=(availableOrder.length?availableOrder:effectiveOrder)[Math.min(inn.wickets||0,(availableOrder.length?availableOrder:effectiveOrder).length-1)];
-    let batter=battingSquad.find(p=>p.name===curName)||battingSquad[0]||{bat:70,name:curName||"Batter"};
-    if(battingLineup&&curName===battingLineup.captain)batter={...batter,bat:(batter.bat||60)+4};
+    const availableOrder=(effectiveOrder.filter(nm=>!(battingInjuries&&battingInjuries[nm]))).length?effectiveOrder.filter(nm=>!(battingInjuries&&battingInjuries[nm])):effectiveOrder;
+    let strikerName=inn.striker||availableOrder[0];
+    let nonStrikerName=inn.nonStriker||availableOrder[Math.min(1,availableOrder.length-1)];
+    let nextBatIdx=inn.nextBatIdx!=null?inn.nextBatIdx:2;
+    let curOverRuns=inn.curOverRuns||0;
+    let curOverWkts=inn.curOverWkts||0;
+    let curBallInOver=inn.curBallInOver||0;
     let bowler=bowlingSquad.find(p=>p.name===match.bowlerChoice)||bowlingSquad[0]||{bowl:70,name:"Bowler"};
     if(bowlingLineup&&bowler.name===bowlingLineup.captain)bowler={...bowler,bowl:(bowler.bowl||60)+4};
-    let runsThisOver=0,wktsThisOver=0;const balls=[];
-    for(let i=0;i<6&&(inn.wickets||0)+wktsThisOver<10;i++){
-      const res=resolveBall(batter,bowler,match.battingDecision||"balanced",match.bowlerDelivery);
-      if(res.r==="W"){wktsThisOver++;balls.push("W")}else{runsThisOver+=res.runs;balls.push(res.r)}
+    let batter=battingSquad.find(p=>p.name===strikerName)||battingSquad[0]||{bat:70,name:strikerName||"Batter"};
+    if(battingLineup&&strikerName===battingLineup.captain)batter={...batter,bat:(batter.bat||60)+4};
+    const res=resolveBall(batter,bowler,match.battingDecision||"balanced",match.bowlerDelivery);
+    let ballResult;
+    if(res.r==="W"){
+      curOverWkts++;ballResult="W";
+      if((inn.wickets||0)+curOverWkts<10){strikerName=availableOrder[nextBatIdx]||strikerName;nextBatIdx++}
+    }else{
+      curOverRuns+=res.runs;ballResult=res.r;
+      if(res.runs%2===1){const tmp=strikerName;strikerName=nonStrikerName;nonStrikerName=tmp}
     }
-    const updatedInn={total:(inn.total||0)+runsThisOver,wickets:(inn.wickets||0)+wktsThisOver,overs:(inn.overs||0)+1,ballHistory:[...(inn.ballHistory||[]),...balls],lastOverBalls:balls,lastOverBatter:batter.name,lastOverBowler:bowler.name};
+    curBallInOver++;
+    const newBallHistory=[...(inn.ballHistory||[]),ballResult];
+    const inningsAllOut=(inn.wickets||0)+curOverWkts>=10;
+    const overComplete=curBallInOver>=6||inningsAllOut;
+    if(!overComplete){
+      const midInn={...inn,striker:strikerName,nonStriker:nonStrikerName,nextBatIdx,curOverRuns,curOverWkts,curBallInOver,ballHistory:newBallHistory};
+      await yt(`sessions/${code}/activeMatch`,match.inn2?{inn2:midInn,bowlerDelivery:null,battingDecision:null}:{inn1:midInn,bowlerDelivery:null,battingDecision:null});
+      return
+    }
+    if(!inningsAllOut){const tmp=strikerName;strikerName=nonStrikerName;nonStrikerName=tmp}
+    const bowlerOvers={...(inn.bowlerOvers||{})};
+    bowlerOvers[bowler.name]=(bowlerOvers[bowler.name]||0)+1;
+    const lastOverBalls=newBallHistory.slice(-curBallInOver);
+    const updatedInn={total:(inn.total||0)+curOverRuns,wickets:(inn.wickets||0)+curOverWkts,overs:(inn.overs||0)+1,ballHistory:newBallHistory,lastOverBalls,lastOverBatter:strikerName,lastOverBowler:bowler.name,striker:strikerName,nonStriker:nonStrikerName,nextBatIdx,bowlerOvers,curOverRuns:0,curOverWkts:0,curBallInOver:0};
     await finishOver(updatedInn)
   }
   async function finishOver(updatedInn){
@@ -192,14 +231,15 @@ function LCB_LiveMatch({code,uid,myTeamId,players}){
     if(!match||phase!=="playing")return;
     if(!oppIsHuman||oppOffline){
       if(iAmBatting&&!match.bowlerChoice){const squad=bowlerPool(),bowler=squad.filter(p=>p.bowl>=52).sort((x,y)=>y.bowl-x.bowl)[0]||squad[0];if(bowler)yt(`sessions/${code}/activeMatch`,{bowlerChoice:bowler.name,bowlerDelivery:null})}
-      if(iAmBowling&&!match.battingDecision){yt(`sessions/${code}/activeMatch`,{battingDecision:"balanced"})}
+      if(iAmBatting&&match.bowlerChoice&&!match.bowlerDelivery){const squad=bowlerPool(),bowler=squad.find(p=>p.name===match.bowlerChoice)||squad[0];if(bowler){const opts=deliveriesFor(bowler);const pick=opts[Math.floor(Math.random()*opts.length)];if(pick)yt(`sessions/${code}/activeMatch`,{bowlerDelivery:pick.key})}}
+      if(iAmBowling&&!match.battingDecision){const opts=shotsAvailable();const pick=opts[Math.floor(Math.random()*opts.length)];if(pick)yt(`sessions/${code}/activeMatch`,{battingDecision:pick.key})}
     }
-  },[match?.bowlerChoice,match?.battingDecision,phase,oppOffline]);
+  },[match?.bowlerChoice,match?.bowlerDelivery,match?.battingDecision,phase,oppOffline]);
   R.useEffect(()=>{
     if(!match)return;
     const iShouldResolve=iAmBatting||!oppIsHuman||oppOffline;
-    if(phase==="playing"&&match.battingDecision&&match.bowlerChoice&&iShouldResolve)resolveOver()
-  },[match?.battingDecision,match?.bowlerChoice,iAmBatting,oppIsHuman,oppOffline]);
+    if(phase==="playing"&&match.battingDecision&&match.bowlerChoice&&match.bowlerDelivery&&iShouldResolve)resolveOneBallStep()
+  },[match?.battingDecision,match?.bowlerChoice,match?.bowlerDelivery,iAmBatting,oppIsHuman,oppOffline]);
   R.useEffect(()=>{
     if(phase==="done"){const pieces=Array.from({length:24},(_,i)=>({id:i,x:Math.random()*100,delay:Math.random()*1.2,col:[d.gold,"#FF6B6B","#4ECDC4","#45B7D1","#96CEB4"][Math.floor(Math.random()*5)]}));setConfetti(pieces)}else{setConfetti([])}
   },[phase]);
@@ -230,13 +270,15 @@ function LCB_LiveMatch({code,uid,myTeamId,players}){
     const battingOrderNames=(myOrders[battingTeam]&&myOrders[battingTeam].order)||[];
     const impactName=myOrders[battingTeam]&&myOrders[battingTeam].impact;
     const effectiveOrder=isSecondInnings&&impactName&&!battingOrderNames.includes(impactName)?[...battingOrderNames,impactName]:battingOrderNames;
-    const availableOrder=effectiveOrder.filter(nm=>!(battingInjuries&&battingInjuries[nm]));
-    const curName=(availableOrder.length?availableOrder:effectiveOrder)[Math.min(inn.wickets||0,(availableOrder.length?availableOrder:effectiveOrder).length-1)];
+    const availableOrder=(effectiveOrder.filter(nm=>!(battingInjuries&&battingInjuries[nm]))).length?effectiveOrder.filter(nm=>!(battingInjuries&&battingInjuries[nm])):effectiveOrder;
+    const curName=inn.striker||availableOrder[0];
     const isCap=battingLineup&&curName===battingLineup.captain;
+    const ballNum=(inn.curBallInOver||0)+1;
     return(0,f.jsxs)("div",{style:{...B.app,minHeight:"100dvh",padding:24},children:[
-      (0,f.jsx)("div",{style:B.label,children:`YOUR BATTING INTENT \u2014 Over ${(inn.overs||0)+1}`}),
-      curName&&(0,f.jsxs)("div",{style:{fontSize:13,color:d.soft,marginTop:6,marginBottom:4},children:["On strike: ",(0,f.jsx)("strong",{style:{color:d.text},children:curName}),isCap?" (C)":""]}),
-      ["attack","balanced","anchor"].map(opt=>(0,f.jsx)("button",{style:{...B.btn(opt==="attack"?`linear-gradient(135deg,${d.red},#8B0000)`:opt==="balanced"?`linear-gradient(135deg,${d.blue},#2355A8)`:`linear-gradient(135deg,${d.green},#059669)`,"#fff"),marginTop:10},onClick:()=>yt(`sessions/${code}/activeMatch`,{battingDecision:opt}),children:opt==="attack"?"\u26a1 Attack \u2014 Go for boundaries":opt==="balanced"?"\ud83d\udee1 Balanced \u2014 Steady accumulation":"\ud83d\udee1 Anchor \u2014 Rotate, protect wicket"},opt))
+      (0,f.jsxs)("div",{style:B.label,children:["Ball ",ballNum,"/6  \u2014  Over ",(inn.overs||0)+1]}),
+      curName&&(0,f.jsxs)("div",{style:{fontSize:13,color:d.soft,marginTop:6,marginBottom:12},children:["On strike: ",(0,f.jsx)("strong",{style:{color:d.text},children:curName}),isCap?" (C)":""]}),
+      (0,f.jsx)("div",{style:{fontSize:12,color:d.muted,marginBottom:10},children:"Choose your shot for this ball"}),
+      shotsAvailable().map(sh=>(0,f.jsxs)("button",{style:{...B.btn(d.cardHi,d.text),fontSize:13,padding:"10px 14px",marginTop:8,textAlign:"left",display:"block"},onClick:()=>yt(`sessions/${code}/activeMatch`,{battingDecision:sh.key}),children:[sh.emoji," ",sh.label]},sh.key))
     ]})
   }
   if(iAmBowling&&!match.bowlerChoice){
@@ -247,11 +289,18 @@ function LCB_LiveMatch({code,uid,myTeamId,players}){
       squad.slice(0,9).map(bp=>{
         const isCap=bowlingLineup&&bp.name===bowlingLineup.captain;
         const isImpact=isSecondInnings&&myOrders[bowlingTeam]&&myOrders[bowlingTeam].impact===bp.name;
-        return(0,f.jsxs)("div",{style:{...B.card,marginTop:8},children:[
-          (0,f.jsxs)("div",{style:{fontSize:14,fontWeight:700},children:[bp.name,isCap?" (C)":"",isImpact?" \u2b50":""]}),
-          (0,f.jsx)("div",{style:{display:"flex",flexWrap:"wrap",gap:6,marginTop:6},children:deliveriesFor(bp).map(dl=>(0,f.jsxs)("button",{style:{...B.btn(d.cardHi,d.text),fontSize:12,padding:"6px 10px",width:"auto"},onClick:()=>yt(`sessions/${code}/activeMatch`,{bowlerChoice:bp.name,bowlerDelivery:dl.key}),children:[dl.emoji," ",dl.label]},dl.key))})
-        ]},bp.name)
+        const oversBowled=(inn.bowlerOvers&&inn.bowlerOvers[bp.name])||0;
+        return(0,f.jsx)("button",{style:{...B.btn(d.card,d.text),marginTop:8,textAlign:"left",display:"block"},onClick:()=>yt(`sessions/${code}/activeMatch`,{bowlerChoice:bp.name,bowlerDelivery:null}),children:(0,f.jsxs)("div",{style:{fontSize:14,fontWeight:700},children:[bp.name,isCap?" (C)":"",isImpact?" \u2b50":"",(0,f.jsxs)("span",{style:{fontSize:11,color:d.muted,fontWeight:400,marginLeft:8},children:[oversBowled,"/4 overs bowled"]})]})},bp.name)
       })
+    ]})
+  }
+  if(iAmBowling&&match.bowlerChoice&&!match.bowlerDelivery){
+    const bowler=bowlerPool().find(p=>p.name===match.bowlerChoice)||{name:match.bowlerChoice,bowl:70};
+    const ballNum=(inn.curBallInOver||0)+1;
+    return(0,f.jsxs)("div",{style:{...B.app,minHeight:"100dvh",padding:24},children:[
+      (0,f.jsxs)("div",{style:{...B.label,color:d.blue},children:[bowler.name,"  \u2014  Ball ",ballNum,"/6"]}),
+      (0,f.jsx)("div",{style:{fontSize:12,color:d.muted,marginTop:4,marginBottom:12},children:"Choose this ball\u2019s delivery"}),
+      (0,f.jsx)("div",{style:{display:"flex",flexWrap:"wrap",gap:8},children:deliveriesFor(bowler).map(dl=>(0,f.jsxs)("button",{style:{...B.btn(d.cardHi,d.text),fontSize:13,padding:"10px 14px",width:"auto"},onClick:()=>yt(`sessions/${code}/activeMatch`,{bowlerDelivery:dl.key}),children:[dl.emoji," ",dl.label]},dl.key))})
     ]})
   }
   return(0,f.jsxs)("div",{style:{...B.app,minHeight:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,textAlign:"center"},children:[
@@ -263,6 +312,10 @@ function LCB_LiveMatch({code,uid,myTeamId,players}){
         (0,f.jsx)("span",{style:{color:r==="W"?d.red:r==="6"||r==="4"?d.gold:d.muted,fontWeight:700,minWidth:16},children:r}),
         (0,f.jsx)("span",{children:ballCommentary(r,inn.lastOverBatter,inn.lastOverBowler,idx)})
       ]},idx))
+    ]}),
+    (inn.curBallInOver||0)>0&&(0,f.jsxs)("div",{style:{...B.card,marginTop:16,textAlign:"left",maxWidth:340,width:"100%"},children:[
+      (0,f.jsxs)("div",{style:{...B.label,marginBottom:8},children:["THIS OVER \u2014 ",inn.curBallInOver,"/6 balls"]}),
+      (0,f.jsxs)("div",{style:{fontSize:13,color:d.soft},children:[inn.curOverRuns||0," runs",(inn.curOverWkts||0)>0?`, ${inn.curOverWkts} wkt${inn.curOverWkts>1?"s":""}`:""," so far"]})
     ]}),
     (0,f.jsx)("div",{style:{fontSize:13,color:d.muted,marginTop:16},children:"Waiting for opponent\u2019s decision\u2026"})
   ]})
@@ -361,7 +414,7 @@ function SquadSetup({code,uid,myTeamId,squad}){
     !canSave&&(0,f.jsx)("div",{style:{fontSize:11,color:d.muted,textAlign:"center",marginTop:10},children:"Pick a captain and a different vice-captain to continue"})
   ]})
 }
-function Nm(){let[t,l]=(0,R.useState)("splash"),[a,e]=(0,R.useState)(null),[n,u]=(0,R.useState)(null),[i,c]=(0,R.useState)(null),[o,h]=(0,R.useState)("connecting"),[g,p]=(0,R.useState)(""),[w,W]=(0,R.useState)(!1),r=Nt(n?`sessions/${n}/meta`:null,[n]),m=Nt(n?`sessions/${n}/players`:null,[n]),O=Nt(n?`sessions/${n}/squads`:null,[n]),A=Nt(n?`sessions/${n}/table`:null,[n]);(0,R.useEffect)(()=>{let M=!1,{fbAuth:z}=Ti();if(!z){p("Firebase not ready"),h("error");return}return z.signInAnonymously().then(S=>{M||(e(S.user.uid),h("ready"))}).catch(S=>{M||(p(S.message),h("error"))}),()=>{M=!0}},[]),(0,R.useEffect)(()=>{if(!r||!n)return;let M=r.status;M==="auction"&&t!=="auction"&&l("auction"),M==="season"&&t!=="season"&&l("season"),M==="match"&&t!=="match"&&l("match"),M==="playoffs"&&t!=="playoffs"&&l("playoffs"),M==="awards"&&t!=="awards"&&l("awards")},[r?.status,n]),(0,R.useEffect)(()=>{try{localStorage.getItem("lcb_seen_howto")||W(!0)}catch{}},[]);let x=m||{},y=(()=>{try{return sessionStorage.getItem("lcb_team")}catch{return null}})(),s=i||a&&x[a]?.teamId||y||null;function v(M,z){u(M),c(z);try{sessionStorage.setItem("lcb_team",z)}catch{}l("briefing")}function b(M,z){u(M),c(z);try{sessionStorage.setItem("lcb_team",z)}catch{}l("briefing")}function dh(){try{localStorage.setItem("lcb_seen_howto","1")}catch{}W(!1)}return w?(0,f.jsx)(HowToPlay,{onDone:dh}):t==="host"&&a?(0,f.jsx)(Bm,{uid:a,onCreated:v}):t==="join"&&a?(0,f.jsx)(xm,{uid:a,onJoined:b}):t==="briefing"&&n&&s?(0,f.jsx)(ChairmanBriefing,{teamId:s,onContinue:()=>l("lobby")}):t==="lobby"&&n&&a?(0,f.jsx)(Dm,{code:n,uid:a}):t==="auction"&&n&&s?(0,f.jsx)(_m,{code:n,uid:a,myTeamId:s,players:x}):t==="season"&&n&&s?(0,f.jsx)(Um,{code:n,uid:a,myTeamId:s,players:x,routerState:t}):t==="match"&&n&&s?(0,f.jsx)(LCB_LiveMatch,{code:n,uid:a,myTeamId:s,players:x}):t==="playoffs"&&n&&s?(0,f.jsx)(Rm,{code:n,uid:a,myTeamId:s,players:x,table:A||{}}):t==="awards"&&n&&s?(0,f.jsx)(Cm,{code:n,uid:a,myTeamId:s,players:x}):(0,f.jsxs)("div",{style:{...B.app,minHeight:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,textAlign:"center"},children:[(0,f.jsx)("div",{style:{fontSize:52,marginBottom:16},children:"\u{1F3C6}"}),(0,f.jsx)("div",{style:{fontSize:28,fontWeight:800,color:d.gold},children:"LEAGUE CRICKET BOSS"}),(0,f.jsx)("div",{style:{fontSize:12,color:d.muted,marginTop:6,letterSpacing:2},children:"MULTIPLAYER \xB7 v1.5"}),(0,f.jsx)("div",{style:{color:d.gold,marginTop:4,fontSize:10,letterSpacing:1},children:"BUILD 2026-07-12-G \xB7 navigation no longer depends on unreliable listener"}),o==="connecting"&&(0,f.jsx)("div",{style:{color:d.muted,fontSize:14,marginTop:16},children:"Connecting\u2026"}),o==="error"&&(0,f.jsx)("div",{style:{color:d.red,fontSize:13,marginTop:16},children:g}),o==="ready"&&(0,f.jsxs)("div",{style:{width:"100%",maxWidth:360,marginTop:24},children:[(0,f.jsx)("button",{style:B.btn(`linear-gradient(135deg,${d.gold},#B87B10)`,"#000"),onClick:()=>l("host"),children:"\u{1F3DF} Host a Game"}),(0,f.jsx)("button",{style:B.btn(`linear-gradient(135deg,${d.blue},#2355A8)`,"#fff"),onClick:()=>l("join"),children:"\u{1F517} Join a Game"})]})]})}
+function Nm(){let[t,l]=(0,R.useState)("splash"),[a,e]=(0,R.useState)(null),[n,u]=(0,R.useState)(null),[i,c]=(0,R.useState)(null),[o,h]=(0,R.useState)("connecting"),[g,p]=(0,R.useState)(""),[w,W]=(0,R.useState)(!1),r=Nt(n?`sessions/${n}/meta`:null,[n]),m=Nt(n?`sessions/${n}/players`:null,[n]),O=Nt(n?`sessions/${n}/squads`:null,[n]),A=Nt(n?`sessions/${n}/table`:null,[n]);(0,R.useEffect)(()=>{let M=!1,{fbAuth:z}=Ti();if(!z){p("Firebase not ready"),h("error");return}return z.signInAnonymously().then(S=>{M||(e(S.user.uid),h("ready"))}).catch(S=>{M||(p(S.message),h("error"))}),()=>{M=!0}},[]),(0,R.useEffect)(()=>{if(!r||!n)return;let M=r.status;M==="auction"&&t!=="auction"&&l("auction"),M==="season"&&t!=="season"&&l("season"),M==="match"&&t!=="match"&&l("match"),M==="playoffs"&&t!=="playoffs"&&l("playoffs"),M==="awards"&&t!=="awards"&&l("awards")},[r?.status,n]),(0,R.useEffect)(()=>{try{localStorage.getItem("lcb_seen_howto")||W(!0)}catch{}},[]);let x=m||{},y=(()=>{try{return sessionStorage.getItem("lcb_team")}catch{return null}})(),s=i||a&&x[a]?.teamId||y||null;function v(M,z){u(M),c(z);try{sessionStorage.setItem("lcb_team",z)}catch{}l("briefing")}function b(M,z){u(M),c(z);try{sessionStorage.setItem("lcb_team",z)}catch{}l("briefing")}function dh(){try{localStorage.setItem("lcb_seen_howto","1")}catch{}W(!1)}return w?(0,f.jsx)(HowToPlay,{onDone:dh}):t==="host"&&a?(0,f.jsx)(Bm,{uid:a,onCreated:v}):t==="join"&&a?(0,f.jsx)(xm,{uid:a,onJoined:b}):t==="briefing"&&n&&s?(0,f.jsx)(ChairmanBriefing,{teamId:s,onContinue:()=>l("lobby")}):t==="lobby"&&n&&a?(0,f.jsx)(Dm,{code:n,uid:a}):t==="auction"&&n&&s?(0,f.jsx)(_m,{code:n,uid:a,myTeamId:s,players:x}):t==="season"&&n&&s?(0,f.jsx)(Um,{code:n,uid:a,myTeamId:s,players:x,routerState:t}):t==="match"&&n&&s?(0,f.jsx)(LCB_LiveMatch,{code:n,uid:a,myTeamId:s,players:x}):t==="playoffs"&&n&&s?(0,f.jsx)(Rm,{code:n,uid:a,myTeamId:s,players:x,table:A||{}}):t==="awards"&&n&&s?(0,f.jsx)(Cm,{code:n,uid:a,myTeamId:s,players:x}):(0,f.jsxs)("div",{style:{...B.app,minHeight:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,textAlign:"center"},children:[(0,f.jsx)("div",{style:{fontSize:52,marginBottom:16},children:"\u{1F3C6}"}),(0,f.jsx)("div",{style:{fontSize:28,fontWeight:800,color:d.gold},children:"LEAGUE CRICKET BOSS"}),(0,f.jsx)("div",{style:{fontSize:12,color:d.muted,marginTop:6,letterSpacing:2},children:"MULTIPLAYER \xB7 v1.5"}),(0,f.jsx)("div",{style:{color:d.gold,marginTop:4,fontSize:10,letterSpacing:1},children:"BUILD 2026-07-12-J \xB7 both players decide every ball: shot + delivery"}),o==="connecting"&&(0,f.jsx)("div",{style:{color:d.muted,fontSize:14,marginTop:16},children:"Connecting\u2026"}),o==="error"&&(0,f.jsx)("div",{style:{color:d.red,fontSize:13,marginTop:16},children:g}),o==="ready"&&(0,f.jsxs)("div",{style:{width:"100%",maxWidth:360,marginTop:24},children:[(0,f.jsx)("button",{style:B.btn(`linear-gradient(135deg,${d.gold},#B87B10)`,"#000"),onClick:()=>l("host"),children:"\u{1F3DF} Host a Game"}),(0,f.jsx)("button",{style:B.btn(`linear-gradient(135deg,${d.blue},#2355A8)`,"#fff"),onClick:()=>l("join"),children:"\u{1F517} Join a Game"})]})]})}
 function go(){return(0,f.jsx)(ho,{children:(0,f.jsx)(Nm,{})})}var S1=za(Zn());(0,p1.createRoot)(document.getElementById("root")).render((0,S1.jsx)(go,{}));})();
 /*! Bundled license information:
 
