@@ -12964,6 +12964,20 @@ Error generating stack: ` + e.message + `
     }
     const pitch = ground && PITCH_DB[ground];
     const nonXI = squad.filter(p => !order.includes(p.name));
+    const xiPlayers = squad.filter(p => order.includes(p.name));
+    const hasWK = xiPlayers.some(p => p.role === "WK" || p.role === "WKB");
+    const bowlOptions = xiPlayers.filter(p => p.role === "BOWL" || p.role === "AR").length;
+    const ROLE_GROUPS = [
+      ["WK", "WICKETKEEPERS"],
+      ["BAT", "BATTERS"],
+      ["AR", "ALL-ROUNDERS"],
+      ["BOWL", "BOWLERS"]
+    ];
+    function roleRatingLabel(p) {
+      if (p.role === "BOWL") return `BWL ${p.bowl}`;
+      if (p.role === "AR") return `BAT ${p.bat} · BWL ${p.bowl}`;
+      return `BAT ${p.bat}`;
+    }
     return (0, f.jsxs)("div", {
       style: {
         ...B.app,
@@ -13053,28 +13067,99 @@ Error generating stack: ` + e.message + `
           },
           children: order.length ? order.map((nm, idx) => `${idx+1}.${nm}`).join("  \u00b7  ") : "Tap players below, in the order you want them to bat"
         }),
-        (0, f.jsx)("div", {
+        order.length > 0 && (0, f.jsxs)("div", {
           style: {
             display: "flex",
-            flexWrap: "wrap",
             gap: 6,
-            marginBottom: 18
+            flexWrap: "wrap",
+            marginBottom: 10
           },
-          children: squad.map(p => {
-            const picked = order.includes(p.name);
-            const full = order.length >= XI_SIZE && !picked;
-            return (0, f.jsxs)("button", {
-              disabled: full,
-              onClick: () => toggleOrder(p.name),
+          children: [
+            (0, f.jsx)("div", {
               style: {
-                ...B.btn(picked ? `linear-gradient(135deg,${d.green},#059669)` : d.cardHi, picked ? "#fff" : d.text, full ? .4 : 1),
-                width: "auto",
-                fontSize: 12,
-                padding: "6px 10px"
+                fontSize: 11,
+                fontWeight: 700,
+                padding: "3px 8px",
+                borderRadius: 20,
+                background: hasWK ? `${d.green}22` : `${d.red}22`,
+                color: hasWK ? d.green : d.red
               },
-              children: [picked ? `${order.indexOf(p.name)+1}. ` : "", p.name]
-            }, p.name)
+              children: hasWK ? "\u2713 WK" : "\u26a0 No keeper"
+            }),
+            (0, f.jsx)("div", {
+              style: {
+                fontSize: 11,
+                fontWeight: 700,
+                padding: "3px 8px",
+                borderRadius: 20,
+                background: bowlOptions >= 5 ? `${d.green}22` : `${d.red}22`,
+                color: bowlOptions >= 5 ? d.green : d.red
+              },
+              children: `${bowlOptions} bowling option${bowlOptions===1?"":"s"}`
+            })
+          ]
+        }),
+        ROLE_GROUPS.map(([roleKey, roleLabel]) => {
+          const playersInRole = squad.filter(p => (roleKey === "WK" ? p.role === "WK" || p.role === "WKB" : p.role === roleKey));
+          if (!playersInRole.length) return null;
+          return (0, f.jsxs)("div", {
+            key: roleKey,
+            style: {
+              marginBottom: 10
+            },
+            children: [
+              (0, f.jsx)("div", {
+                style: {
+                  ...B.label,
+                  fontSize: 10,
+                  marginBottom: 6
+                },
+                children: roleLabel
+              }),
+              (0, f.jsx)("div", {
+                style: {
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 6
+                },
+                children: playersInRole.map(p => {
+                  const picked = order.includes(p.name);
+                  const full = order.length >= XI_SIZE && !picked;
+                  return (0, f.jsxs)("button", {
+                    disabled: full,
+                    onClick: () => toggleOrder(p.name),
+                    style: {
+                      ...B.btn(picked ? `linear-gradient(135deg,${d.green},#059669)` : d.cardHi, picked ? "#fff" : d.text, full ? .4 : 1),
+                      width: "auto",
+                      fontSize: 12,
+                      padding: "6px 10px",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "flex-start",
+                      gap: 2
+                    },
+                    children: [
+                      (0, f.jsxs)("span", {
+                        children: [picked ? `${order.indexOf(p.name)+1}. ` : "", p.name]
+                      }),
+                      (0, f.jsx)("span", {
+                        style: {
+                          fontSize: 9,
+                          opacity: .75
+                        },
+                        children: roleRatingLabel(p)
+                      })
+                    ]
+                  }, p.name)
+                })
+              })
+            ]
           })
+        }),
+        (0, f.jsx)("div", {
+          style: {
+            marginBottom: 8
+          }
         }),
         (0, f.jsx)("div", {
           style: {
@@ -13097,15 +13182,30 @@ Error generating stack: ` + e.message + `
             gap: 6,
             marginBottom: 22
           },
-          children: nonXI.map(p => (0, f.jsx)("button", {
+          children: nonXI.map(p => (0, f.jsxs)("button", {
             onClick: () => setImpact(impact === p.name ? null : p.name),
             style: {
               ...B.btn(impact === p.name ? `linear-gradient(135deg,${d.purple},#6B21A8)` : d.cardHi, impact === p.name ? "#fff" : d.text),
               width: "auto",
               fontSize: 12,
-              padding: "6px 10px"
+              padding: "6px 10px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: 2
             },
-            children: p.name
+            children: [
+              (0, f.jsx)("span", {
+                children: p.name
+              }),
+              (0, f.jsx)("span", {
+                style: {
+                  fontSize: 9,
+                  opacity: .75
+                },
+                children: roleRatingLabel(p)
+              })
+            ]
           }, p.name))
         }),
         (0, f.jsx)("button", {
@@ -15167,6 +15267,11 @@ Error generating stack: ` + e.message + `
       })
     }
     const canSave = captain && vc && vc !== captain;
+    function roleRatingLabel(p) {
+      if (p.role === "BOWL") return `BWL ${p.bowl}`;
+      if (p.role === "AR") return `BAT ${p.bat} · BWL ${p.bowl}`;
+      return `BAT ${p.bat}`;
+    }
     return (0, f.jsxs)("div", {
       style: {
         ...B.app,
@@ -15211,15 +15316,30 @@ Error generating stack: ` + e.message + `
             gap: 6,
             marginBottom: 18
           },
-          children: squad.map(p => (0, f.jsx)("button", {
+          children: squad.map(p => (0, f.jsxs)("button", {
             onClick: () => setCaptain(p.name),
             style: {
               ...B.btn(captain === p.name ? `linear-gradient(135deg,${d.gold},${d.goldDim})` : d.cardHi, captain === p.name ? "#000" : d.text),
               width: "auto",
               fontSize: 12,
-              padding: "6px 10px"
+              padding: "6px 10px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: 2
             },
-            children: p.name
+            children: [
+              (0, f.jsx)("span", {
+                children: p.name
+              }),
+              (0, f.jsx)("span", {
+                style: {
+                  fontSize: 9,
+                  opacity: .75
+                },
+                children: roleRatingLabel(p)
+              })
+            ]
           }, p.name))
         }),
         (0, f.jsx)("div", {
@@ -15236,15 +15356,30 @@ Error generating stack: ` + e.message + `
             gap: 6,
             marginBottom: 22
           },
-          children: squad.filter(p => p.name !== captain).map(p => (0, f.jsx)("button", {
+          children: squad.filter(p => p.name !== captain).map(p => (0, f.jsxs)("button", {
             onClick: () => setVc(p.name),
             style: {
               ...B.btn(vc === p.name ? `linear-gradient(135deg,${d.blue},#2355A8)` : d.cardHi, vc === p.name ? "#fff" : d.text),
               width: "auto",
               fontSize: 12,
-              padding: "6px 10px"
+              padding: "6px 10px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: 2
             },
-            children: p.name
+            children: [
+              (0, f.jsx)("span", {
+                children: p.name
+              }),
+              (0, f.jsx)("span", {
+                style: {
+                  fontSize: 9,
+                  opacity: .75
+                },
+                children: roleRatingLabel(p)
+              })
+            ]
           }, p.name))
         }),
         (0, f.jsx)("button", {
