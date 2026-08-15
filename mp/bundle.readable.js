@@ -13841,6 +13841,7 @@ Error generating stack: ` + e.message + `
       const effectiveOrder = isSecondInnings && impactName && !battingOrderNames.includes(impactName) ? [...battingOrderNames, impactName] : battingOrderNames;
       const availableOrder = (effectiveOrder.filter(nm => !(battingInjuries && battingInjuries[nm]))).length ? effectiveOrder.filter(nm => !(battingInjuries && battingInjuries[nm])) : effectiveOrder;
       const curName = inn.striker || availableOrder[0];
+      const nonStrikerName2 = inn.nonStriker || availableOrder.find(nm => nm !== curName) || "";
       const isCap = battingLineup && curName === battingLineup.captain;
       const ballNum = (inn.curBallInOver || 0) + 1;
       return (0, f.jsxs)("div", {
@@ -13952,6 +13953,35 @@ Error generating stack: ` + e.message + `
               }),
               (0, f.jsxs)("div", {
                 style: {
+                  textAlign: "center"
+                },
+                children: [
+                  (0, f.jsx)("div", {
+                    style: {
+                      fontSize: 10,
+                      color: d.muted
+                    },
+                    children: "NON-STRIKER"
+                  }),
+                  (0, f.jsx)("div", {
+                    style: {
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: d.soft
+                    },
+                    children: nonStrikerName2
+                  }),
+                  (0, f.jsxs)("div", {
+                    style: {
+                      fontSize: 11,
+                      color: d.muted
+                    },
+                    children: [inn.batScores?.[nonStrikerName2]?.runs || 0, "(", inn.batScores?.[nonStrikerName2]?.balls || 0, ")"]
+                  })
+                ]
+              }),
+              (0, f.jsxs)("div", {
+                style: {
                   textAlign: "right"
                 },
                 children: [
@@ -13978,6 +14008,44 @@ Error generating stack: ` + e.message + `
                   })
                 ]
               })
+            ]
+          }),
+          inn.lastOverBalls && inn.lastOverBalls.length > 0 && (0, f.jsxs)("div", {
+            style: {
+              ...B.card,
+              marginBottom: 14,
+              textAlign: "left"
+            },
+            children: [
+              (0, f.jsx)("div", {
+                style: {
+                  ...B.label,
+                  marginBottom: 8
+                },
+                children: "LAST OVER"
+              }),
+              inn.lastOverBalls.map((r, idx) => (0, f.jsxs)("div", {
+                style: {
+                  fontSize: 12,
+                  color: d.soft,
+                  marginBottom: 4,
+                  display: "flex",
+                  gap: 8
+                },
+                children: [
+                  (0, f.jsx)("span", {
+                    style: {
+                      color: r === "W" ? d.red : r === "6" || r === "4" ? d.gold : d.muted,
+                      fontWeight: 700,
+                      minWidth: 16
+                    },
+                    children: r
+                  }),
+                  (0, f.jsx)("span", {
+                    children: ballCommentary(r, inn.lastOverBatter, inn.lastOverBowler, idx)
+                  })
+                ]
+              }, idx))
             ]
           }),
           inn.lastBallResult && (0, f.jsxs)("div", {
@@ -14106,6 +14174,69 @@ Error generating stack: ` + e.message + `
           padding: 24
         },
         children: [
+          (0, f.jsxs)("div", {
+            style: {
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              marginBottom: 16
+            },
+            children: [
+              (0, f.jsxs)("div", {
+                style: {
+                  fontSize: 20,
+                  fontWeight: 800,
+                  color: d.gold
+                },
+                children: [liveTotal, "/", liveWkts, " (", Math.floor(ballsBowledTotal / 6), ".", ballsBowledTotal % 6, " ov)"]
+              }),
+              match.target ? (0, f.jsxs)("div", {
+                style: {
+                  fontSize: 12,
+                  color: d.muted
+                },
+                children: ["Need ", runsNeeded, " off ", ballsRemaining]
+              }) : null
+            ]
+          }),
+          inn.lastOverBalls && inn.lastOverBalls.length > 0 && (0, f.jsxs)("div", {
+            style: {
+              ...B.card,
+              marginBottom: 14,
+              textAlign: "left"
+            },
+            children: [
+              (0, f.jsx)("div", {
+                style: {
+                  ...B.label,
+                  marginBottom: 8
+                },
+                children: "LAST OVER"
+              }),
+              inn.lastOverBalls.map((r, idx) => (0, f.jsxs)("div", {
+                style: {
+                  fontSize: 12,
+                  color: d.soft,
+                  marginBottom: 4,
+                  display: "flex",
+                  gap: 8
+                },
+                children: [
+                  (0, f.jsx)("span", {
+                    style: {
+                      color: r === "W" ? d.red : r === "6" || r === "4" ? d.gold : d.muted,
+                      fontWeight: 700,
+                      minWidth: 16
+                    },
+                    children: r
+                  }),
+                  (0, f.jsx)("span", {
+                    children: ballCommentary(r, inn.lastOverBatter, inn.lastOverBowler, idx)
+                  })
+                ]
+              }, idx))
+            ]
+          }),
           (0, f.jsx)("div", {
             style: {
               ...B.label,
@@ -14157,6 +14288,7 @@ Error generating stack: ` + e.message + `
       const oppOrders = match.matchOrders || {};
       const oppOrderNames = (oppOrders[battingTeam] && oppOrders[battingTeam].order) || [];
       const curBatterName = inn.striker || oppOrderNames[0];
+      const nonStrikerName2 = inn.nonStriker || oppOrderNames.find(nm => nm !== curBatterName) || "";
       return (0, f.jsxs)("div", {
         style: {
           ...B.app,
@@ -14266,6 +14398,35 @@ Error generating stack: ` + e.message + `
               }),
               (0, f.jsxs)("div", {
                 style: {
+                  textAlign: "center"
+                },
+                children: [
+                  (0, f.jsx)("div", {
+                    style: {
+                      fontSize: 10,
+                      color: d.muted
+                    },
+                    children: "NON-STRIKER"
+                  }),
+                  (0, f.jsx)("div", {
+                    style: {
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: d.soft
+                    },
+                    children: nonStrikerName2
+                  }),
+                  (0, f.jsxs)("div", {
+                    style: {
+                      fontSize: 11,
+                      color: d.muted
+                    },
+                    children: [inn.batScores?.[nonStrikerName2]?.runs || 0, "(", inn.batScores?.[nonStrikerName2]?.balls || 0, ")"]
+                  })
+                ]
+              }),
+              (0, f.jsxs)("div", {
+                style: {
                   textAlign: "right"
                 },
                 children: [
@@ -14292,6 +14453,44 @@ Error generating stack: ` + e.message + `
                   })
                 ]
               })
+            ]
+          }),
+          inn.lastOverBalls && inn.lastOverBalls.length > 0 && (0, f.jsxs)("div", {
+            style: {
+              ...B.card,
+              marginBottom: 14,
+              textAlign: "left"
+            },
+            children: [
+              (0, f.jsx)("div", {
+                style: {
+                  ...B.label,
+                  marginBottom: 8
+                },
+                children: "LAST OVER"
+              }),
+              inn.lastOverBalls.map((r, idx) => (0, f.jsxs)("div", {
+                style: {
+                  fontSize: 12,
+                  color: d.soft,
+                  marginBottom: 4,
+                  display: "flex",
+                  gap: 8
+                },
+                children: [
+                  (0, f.jsx)("span", {
+                    style: {
+                      color: r === "W" ? d.red : r === "6" || r === "4" ? d.gold : d.muted,
+                      fontWeight: 700,
+                      minWidth: 16
+                    },
+                    children: r
+                  }),
+                  (0, f.jsx)("span", {
+                    children: ballCommentary(r, inn.lastOverBatter, inn.lastOverBowler, idx)
+                  })
+                ]
+              }, idx))
             ]
           }),
           inn.lastBallResult && (0, f.jsxs)("div", {
