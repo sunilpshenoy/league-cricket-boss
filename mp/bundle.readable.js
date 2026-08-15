@@ -10376,8 +10376,9 @@ Error generating stack: ` + e.message + `
               onClick: () => u(m),
               style: {
                 ...B.card,
-                border: `2px solid ${A?O.color:d.border}`,
-                background: A ? `${O.color}18` : void 0,
+                border: `2px solid ${A?O.color:O.color+"33"}`,
+                background: `linear-gradient(145deg,${O.color}${A?"33":"1A"},${O.dark||d.card})`,
+                boxShadow: A ? `0 0 0 1px ${O.color}55` : void 0,
                 cursor: "pointer",
                 textAlign: "center",
                 padding: "14px 10px"
@@ -10639,8 +10640,9 @@ Error generating stack: ` + e.message + `
               onClick: () => !M && h(v),
               style: {
                 ...B.card,
-                border: `2px solid ${z?b.color:d.border}`,
-                background: z ? `${b.color}18` : void 0,
+                border: `2px solid ${z?b.color:b.color+"33"}`,
+                background: `linear-gradient(145deg,${b.color}${z?"33":"1A"},${b.dark||d.card})`,
+                boxShadow: z ? `0 0 0 1px ${b.color}55` : void 0,
                 cursor: M ? "not-allowed" : "pointer",
                 textAlign: "center",
                 padding: "14px 10px",
@@ -11884,14 +11886,15 @@ Error generating stack: ` + e.message + `
           },
           U = b.findIndex(nt => nt.id === a) + 1,
           At = U > 0 && U <= 4;
-        return (0, f.jsx)("div", {
+        const winRate = E.p > 0 ? E.w / E.p : null;
+        return (0, f.jsxs)("div", {
           style: {
             padding: "10px 16px",
             borderBottom: `1px solid ${d.border}`,
             background: `linear-gradient(90deg,${M}18,transparent)`,
             flexShrink: 0
           },
-          children: (0, f.jsxs)("div", {
+          children: [(0, f.jsxs)("div", {
             style: {
               display: "flex",
               gap: 12,
@@ -11968,7 +11971,45 @@ Error generating stack: ` + e.message + `
                 children: ["NRR ", E.nrr > 0 ? "+" : "", E.nrr || 0]
               })]
             })]
-          })
+          }), winRate != null && (0, f.jsxs)("div", {
+            style: {
+              marginTop: 10
+            },
+            children: [
+              (0, f.jsxs)("div", {
+                style: {
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: 10,
+                  color: d.muted,
+                  marginBottom: 4
+                },
+                children: ["SEASON FORM", (0, f.jsxs)("span", {
+                  style: {
+                    color: M,
+                    fontWeight: 700
+                  },
+                  children: [Math.round(winRate * 100), "% win rate"]
+                })]
+              }),
+              (0, f.jsx)("div", {
+                style: {
+                  height: 6,
+                  borderRadius: 3,
+                  background: d.faint,
+                  overflow: "hidden"
+                },
+                children: (0, f.jsx)("div", {
+                  style: {
+                    height: "100%",
+                    width: `${Math.round(winRate*100)}%`,
+                    background: `linear-gradient(90deg,${M},${d.gold})`,
+                    borderRadius: 3
+                  }
+                })
+              })
+            ]
+          })]
         })
       })(), (0, f.jsx)("div", {
         style: {
