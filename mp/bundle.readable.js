@@ -15740,7 +15740,7 @@ Error generating stack: ` + e.message + `
           fontSize: 10,
           letterSpacing: 1
         },
-        children: "BUILD 2026-07-12-M \xB7 SP-style ball chips, live stats, risk hints"
+        children: "BUILD 2026-08-15-A \xB7 toss, richer XI/squad screens, live commentary"
       }), o === "connecting" && (0, f.jsx)("div", {
         style: {
           color: d.muted,
