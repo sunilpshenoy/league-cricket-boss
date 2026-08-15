@@ -9578,7 +9578,21 @@ Error generating stack: ` + e.message + `
     try {
       return await Kn(t).update(l)
     } catch (a) {
-      console.error(a)
+      console.error(a);
+      // Silent failure was Issue #2 from the handover doc: yt() swallowed
+      // write errors with no UI-visible signal, on a phone where the console
+      // is invisible. Rather than converting every one of the ~35 call
+      // sites to ytStrict() (large, unverifiable blast radius), broadcast a
+      // DOM event that the app root (Nm()) listens for globally and shows
+      // as a dismissible banner, regardless of which screen is active.
+      try {
+        typeof window < "u" && window.dispatchEvent(new CustomEvent("lcb:writeError", {
+          detail: {
+            path: t,
+            message: a && a.message ? a.message : String(a)
+          }
+        }))
+      } catch {}
     }
   }
   async function ytStrict(t, l) {
@@ -15056,7 +15070,7 @@ Error generating stack: ` + e.message + `
   }
 
   function Nm() {
-    let [t, l] = (0, R.useState)("splash"), [a, e] = (0, R.useState)(null), [n, u] = (0, R.useState)(null), [i, c] = (0, R.useState)(null), [o, h] = (0, R.useState)("connecting"), [g, p] = (0, R.useState)(""), [w, W] = (0, R.useState)(!1), r = Nt(n ? `sessions/${n}/meta` : null, [n]), m = Nt(n ? `sessions/${n}/players` : null, [n]), O = Nt(n ? `sessions/${n}/squads` : null, [n]), A = Nt(n ? `sessions/${n}/table` : null, [n]);
+    let [t, l] = (0, R.useState)("splash"), [a, e] = (0, R.useState)(null), [n, u] = (0, R.useState)(null), [i, c] = (0, R.useState)(null), [o, h] = (0, R.useState)("connecting"), [g, p] = (0, R.useState)(""), [w, W] = (0, R.useState)(!1), [ne, setNe] = (0, R.useState)(null), r = Nt(n ? `sessions/${n}/meta` : null, [n]), m = Nt(n ? `sessions/${n}/players` : null, [n]), O = Nt(n ? `sessions/${n}/squads` : null, [n]), A = Nt(n ? `sessions/${n}/table` : null, [n]);
     (0, R.useEffect)(() => {
       let M = !1,
         {
@@ -15081,6 +15095,18 @@ Error generating stack: ` + e.message + `
       try {
         localStorage.getItem("lcb_seen_howto") || W(!0)
       } catch {}
+    }, []);
+    (0, R.useEffect)(() => {
+      // Global listener for the "lcb:writeError" event yt() broadcasts on
+      // any failed Firebase write, mounted once at the app root so it
+      // catches failures no matter which screen is currently showing.
+      function on(ev) {
+        setNe(ev.detail && ev.detail.message ? ev.detail.message : "Save failed — check connection");
+        setTimeout(() => setNe(null), 6e3)
+      }
+      return typeof window < "u" && window.addEventListener("lcb:writeError", on), () => {
+        typeof window < "u" && window.removeEventListener("lcb:writeError", on)
+      }
     }, []);
     let x = m || {},
       y = (() => {
@@ -15114,7 +15140,16 @@ Error generating stack: ` + e.message + `
       } catch {}
       W(!1)
     }
-    return w ? (0, f.jsx)(HowToPlay, {
+    return (0, f.jsxs)(f.Fragment, {
+      children: [ne && (0, f.jsx)("div", {
+        onClick: () => setNe(null),
+        style: {
+          position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 9999,
+          background: d.red, color: "#fff", padding: "10px 16px",
+          fontSize: 13, textAlign: "center", cursor: "pointer"
+        },
+        children: "\u26A0 " + ne + " (tap to dismiss)"
+      }), w ? (0, f.jsx)(HowToPlay, {
       onDone: dh
     }) : t === "host" && a ? (0, f.jsx)(Bm, {
       uid: a,
@@ -15225,6 +15260,7 @@ Error generating stack: ` + e.message + `
           children: "\u{1F517} Join a Game"
         })]
       })]
+    })]
     })
   }
 
