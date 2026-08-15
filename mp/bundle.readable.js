@@ -11775,9 +11775,11 @@ Error generating stack: ` + e.message + `
           fixtureId: fx.id,
           home: fx.home,
           away: fx.away,
-          battingTeam: fx.home,
-          bowlingTeam: fx.away,
-          phase: "playing",
+          battingTeam: null,
+          bowlingTeam: null,
+          phase: "toss",
+          tossWinner: Math.random() < .5 ? fx.home : fx.away,
+          tossChoice: null,
           battingDecision: null,
           bowlerChoice: null,
           bowlerDelivery: null,
@@ -13254,6 +13256,140 @@ Error generating stack: ` + e.message + `
     })
   }
 
+  function TossScreen({
+    code,
+    myTeamId,
+    home,
+    away,
+    tossWinner
+  }) {
+    const [revealed, setRevealed] = R.useState(false);
+    const [choosing, setChoosing] = R.useState(false);
+    R.useEffect(() => {
+      const timer = setTimeout(() => setRevealed(true), 1200);
+      return () => clearTimeout(timer)
+    }, []);
+    const iWonToss = tossWinner === myTeamId;
+    const winnerTeam = Q[tossWinner];
+    const otherTeamId = tossWinner === home ? away : home;
+    async function choose(bat) {
+      if (choosing) return;
+      setChoosing(true);
+      const battingTeam = bat ? tossWinner : otherTeamId;
+      const bowlingTeam = battingTeam === home ? away : home;
+      try {
+        await yt(`sessions/${code}/activeMatch`, {
+          battingTeam,
+          bowlingTeam,
+          phase: "playing",
+          tossChoice: bat ? "bat" : "bowl"
+        })
+      } catch {
+        setChoosing(false)
+      }
+    }
+    return (0, f.jsxs)("div", {
+      style: {
+        ...B.app,
+        minHeight: "100dvh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        textAlign: "center"
+      },
+      children: [
+        (0, f.jsx)("div", {
+          style: {
+            fontSize: 12,
+            letterSpacing: 2,
+            color: d.muted,
+            marginBottom: 8
+          },
+          children: "THE COIN TOSS"
+        }),
+        (0, f.jsx)("div", {
+          style: {
+            fontSize: 64,
+            marginBottom: 16,
+            animation: revealed ? "none" : "coinFlip 0.4s linear infinite"
+          },
+          children: "🪙"
+        }),
+        (0, f.jsx)("style", {
+          children: "@keyframes coinFlip{0%{transform:rotateY(0deg)}100%{transform:rotateY(360deg)}}"
+        }),
+        !revealed ? (0, f.jsx)("div", {
+          style: {
+            fontSize: 15,
+            color: d.soft
+          },
+          children: "Flipping…"
+        }) : (0, f.jsxs)(f.Fragment, {
+          children: [
+            (0, f.jsxs)("div", {
+              style: {
+                fontSize: 18,
+                fontWeight: 800,
+                color: winnerTeam?.color || d.gold,
+                marginBottom: 4
+              },
+              children: [winnerTeam?.name || tossWinner, " won the toss"]
+            }),
+            iWonToss ? (0, f.jsxs)(f.Fragment, {
+              children: [
+                (0, f.jsx)("div", {
+                  style: {
+                    fontSize: 13,
+                    color: d.muted,
+                    marginBottom: 20
+                  },
+                  children: "What will you do?"
+                }),
+                (0, f.jsxs)("div", {
+                  style: {
+                    display: "flex",
+                    gap: 10,
+                    width: "100%",
+                    maxWidth: 340
+                  },
+                  children: [
+                    (0, f.jsx)("button", {
+                      disabled: choosing,
+                      onClick: () => choose(true),
+                      style: {
+                        ...B.btn(`linear-gradient(135deg,${d.gold},${d.goldDim})`, "#000", choosing ? .6 : 1),
+                        flex: 1
+                      },
+                      children: "🏏 Bat First"
+                    }),
+                    (0, f.jsx)("button", {
+                      disabled: choosing,
+                      onClick: () => choose(false),
+                      style: {
+                        ...B.btn(`linear-gradient(135deg,${d.blue},#2355A8)`, "#fff", choosing ? .6 : 1),
+                        flex: 1
+                      },
+                      children: "🏃 Bowl First"
+                    })
+                  ]
+                })
+              ]
+            }) : (0, f.jsx)("div", {
+              style: {
+                fontSize: 14,
+                color: d.muted,
+                marginTop: 8
+              },
+              children: "Waiting for them to choose to bat or bowl…"
+            })
+          ]
+        })
+      ]
+    })
+  }
+
   function LCB_LiveMatch({
     code,
     uid,
@@ -13871,6 +14007,13 @@ Error generating stack: ` + e.message + `
         paddingTop: 80
       },
       children: "Loading match\u2026"
+    });
+    if (phase === "toss") return (0, f.jsx)(TossScreen, {
+      code,
+      myTeamId,
+      home: match.home,
+      away: match.away,
+      tossWinner: match.tossWinner
     });
     if (!myOrderSet) return (0, f.jsx)(PreMatchOrder, {
       squad: getSquad(myTeamId),
