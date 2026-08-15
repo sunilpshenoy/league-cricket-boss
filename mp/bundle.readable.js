@@ -11873,13 +11873,6 @@ Error generating stack: ` + e.message + `
             marginTop: 6
           },
           children: g
-        }), (0, f.jsxs)("div", {
-          style: {
-            fontSize: 10,
-            color: d.muted,
-            marginTop: 4
-          },
-          children: ["live meta.status: ", String(c?.status), " \u00b7 router local state: ", String(rst)]
         })]
       }), (() => {
         let E = b.find(nt => nt.id === a) || {
