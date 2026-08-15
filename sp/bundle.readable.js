@@ -16830,7 +16830,12 @@ You and your squad against the world. This is what you were built for.`,
     captainName: u,
     onQuickSim: d,
     injuryNote: f,
-    batOrderNames: c
+    batOrderNames: c,
+    // The caller passes onCancel (see the Season Hub's render of this
+    // component), but it was missing from this destructuring, so the
+    // "Back to Hub" button's onClick referenced an undefined global and
+    // threw "onCancel is not defined" instead of navigating back.
+    onCancel
   }) {
     let g = M[t],
       h = M[e.home === t ? e.away : e.home],

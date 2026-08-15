@@ -47,6 +47,15 @@ else
 fi
 
 echo ""
+echo "-- test_sp_prematch_cancel.js --"
+if node tools/test_sp_prematch_cancel.js; then
+  echo "PASS  test_sp_prematch_cancel.js"
+else
+  echo "FAIL  test_sp_prematch_cancel.js"
+  status=1
+fi
+
+echo ""
 if [ "$status" -eq 0 ]; then
   echo "== All checks passed =="
 else
