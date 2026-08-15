@@ -38,6 +38,15 @@ else
 fi
 
 echo ""
+echo "-- test_firebase_listener_isolation.js --"
+if node tools/test_firebase_listener_isolation.js; then
+  echo "PASS  test_firebase_listener_isolation.js"
+else
+  echo "FAIL  test_firebase_listener_isolation.js"
+  status=1
+fi
+
+echo ""
 if [ "$status" -eq 0 ]; then
   echo "== All checks passed =="
 else

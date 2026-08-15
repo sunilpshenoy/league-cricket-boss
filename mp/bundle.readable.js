@@ -9605,19 +9605,23 @@ Error generating stack: ` + e.message + `
     let [a, e] = (0, R.useState)(null);
     return (0, R.useEffect)(() => {
       if (!t) return;
-      let n = null;
+      let n = null, s = null;
       try {
         let {
           fbDb: u
         } = Ti();
         if (!u) return;
-        n = u.ref(t), n.on("value", i => e(i.val()))
+        n = u.ref(t), s = i => e(i.val()), n.on("value", s)
       } catch {
         return
       }
       return () => {
+        // Must pass the specific callback to off() -- ref.off("value") with no
+        // callback deregisters EVERY "value" listener on this path, including
+        // other components' (e.g. the router) that happen to watch the same
+        // path. This was the root cause of listeners silently going stale.
         try {
-          n && n.off("value")
+          n && s && n.off("value", s)
         } catch {}
       }
     }, [t, ...l]), a
