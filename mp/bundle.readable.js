@@ -13402,6 +13402,7 @@ Error generating stack: ` + e.message + `
     const humanIds = new Set(Object.values(players).map(p => p.teamId));
     const [confetti, setConfetti] = R.useState([]);
     const [showReload, setShowReload] = R.useState(!1);
+    const [quickSim, setQuickSim] = R.useState(!1);
     const battingTeam = match?.battingTeam,
       bowlingTeam = match?.bowlingTeam,
       phase = match?.phase;
@@ -13971,6 +13972,35 @@ Error generating stack: ` + e.message + `
       }
     }, [match?.bowlerChoice, match?.bowlerDelivery, match?.battingDecision, phase, oppOffline]);
     R.useEffect(() => {
+      if (!match || phase !== "playing" || !quickSim) return;
+      if (iAmBatting && !match.battingDecision) {
+        const opts = shotsAvailable();
+        const pick = opts[Math.floor(Math.random() * opts.length)];
+        if (pick) yt(`sessions/${code}/activeMatch`, {
+          battingDecision: pick.key
+        })
+      }
+      if (iAmBowling && !match.bowlerChoice) {
+        const squad = bowlerPool(),
+          bowler = squad.filter(p => p.bowl >= 52).sort((x, y) => y.bowl - x.bowl)[0] || squad[0];
+        if (bowler) yt(`sessions/${code}/activeMatch`, {
+          bowlerChoice: bowler.name,
+          bowlerDelivery: null
+        })
+      }
+      if (iAmBowling && match.bowlerChoice && !match.bowlerDelivery) {
+        const squad = bowlerPool(),
+          bowler = squad.find(p => p.name === match.bowlerChoice) || squad[0];
+        if (bowler) {
+          const opts = deliveriesFor(bowler);
+          const pick = opts[Math.floor(Math.random() * opts.length)];
+          if (pick) yt(`sessions/${code}/activeMatch`, {
+            bowlerDelivery: pick.key
+          })
+        }
+      }
+    }, [match?.battingDecision, match?.bowlerChoice, match?.bowlerDelivery, phase, quickSim, iAmBatting, iAmBowling]);
+    R.useEffect(() => {
       if (!match) return;
       const iShouldResolve = iAmBatting || !oppIsHuman || oppOffline;
       if (phase === "playing" && match.battingDecision && match.bowlerChoice && match.bowlerDelivery && iShouldResolve) resolveOneBallStep()
@@ -14437,7 +14467,16 @@ Error generating stack: ` + e.message + `
                 children: "\u2193 risk"
               })]
             })]
-          }, sh.key))
+          }, sh.key)),
+          !quickSim && (0, f.jsx)("button", {
+            onClick: () => setQuickSim(!0),
+            style: {
+              ...B.btn(d.faint, d.soft),
+              marginTop: 16,
+              fontSize: 13
+            },
+            children: "⏩ Quick Sim Rest of Match"
+          })
         ]
       })
     }
@@ -14552,6 +14591,15 @@ Error generating stack: ` + e.message + `
                 })]
               })
             }, bp.name)
+          }),
+          !quickSim && (0, f.jsx)("button", {
+            onClick: () => setQuickSim(!0),
+            style: {
+              ...B.btn(d.faint, d.soft),
+              marginTop: 16,
+              fontSize: 13
+            },
+            children: "⏩ Quick Sim Rest of Match"
           })
         ]
       })
@@ -14888,6 +14936,15 @@ Error generating stack: ` + e.message + `
                 })]
               }, dl.key)
             })
+          }),
+          !quickSim && (0, f.jsx)("button", {
+            onClick: () => setQuickSim(!0),
+            style: {
+              ...B.btn(d.faint, d.soft),
+              marginTop: 16,
+              fontSize: 13
+            },
+            children: "⏩ Quick Sim Rest of Match"
           })
         ]
       })
@@ -15740,7 +15797,7 @@ Error generating stack: ` + e.message + `
           fontSize: 10,
           letterSpacing: 1
         },
-        children: "BUILD 2026-08-15-A \xB7 toss, richer XI/squad screens, live commentary"
+        children: "BUILD 2026-08-15-B \xB7 quick sim rest of match"
       }), o === "connecting" && (0, f.jsx)("div", {
         style: {
           color: d.muted,

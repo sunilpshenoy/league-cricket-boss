@@ -65,6 +65,15 @@ else
 fi
 
 echo ""
+echo "-- test_mp_quicksim.js --"
+if node tools/test_mp_quicksim.js; then
+  echo "PASS  test_mp_quicksim.js"
+else
+  echo "FAIL  test_mp_quicksim.js"
+  status=1
+fi
+
+echo ""
 if [ "$status" -eq 0 ]; then
   echo "== All checks passed =="
 else
