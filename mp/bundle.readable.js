@@ -15665,6 +15665,46 @@ Error generating stack: ` + e.message + `
       } catch {}
     }, []);
     (0, R.useEffect)(() => {
+      // Resume-in-progress-game support: without this, any interruption
+      // (dropped connection, backgrounded tab getting killed, closing and
+      // reopening the browser) loses the player's place entirely with no
+      // way back in, even with the session code -- Join is blocked once a
+      // game has left the lobby. n/i are plain in-memory state with
+      // nothing to restore them from on a fresh mount, so restore from a
+      // persisted record here once anonymous auth resolves.
+      if (!a) return;
+      (async () => {
+        let saved = null;
+        try {
+          saved = JSON.parse(localStorage.getItem("lcb_session") || "null")
+        } catch {}
+        if (!saved || !saved.code || !saved.teamId) return;
+        if (saved.uid && saved.uid !== a) return;
+        try {
+          const player = await vo(`sessions/${saved.code}/players/${a}`);
+          if (!player) {
+            localStorage.removeItem("lcb_session");
+            return
+          }
+          const meta = await vo(`sessions/${saved.code}/meta`);
+          if (!meta) {
+            localStorage.removeItem("lcb_session");
+            return
+          }
+          u(saved.code);
+          c(saved.teamId);
+          const screenForStatus = {
+            auction: "auction",
+            season: "season",
+            match: "match",
+            playoffs: "playoffs",
+            awards: "awards"
+          } [meta.status] || "lobby";
+          l(screenForStatus)
+        } catch {}
+      })()
+    }, [a]);
+    (0, R.useEffect)(() => {
       // Global listener for the "lcb:writeError" event yt() broadcasts on
       // any failed Firebase write, mounted once at the app root so it
       // catches failures no matter which screen is currently showing.
@@ -15689,7 +15729,12 @@ Error generating stack: ` + e.message + `
     function v(M, z) {
       u(M), c(z);
       try {
-        sessionStorage.setItem("lcb_team", z)
+        sessionStorage.setItem("lcb_team", z);
+        localStorage.setItem("lcb_session", JSON.stringify({
+          code: M,
+          teamId: z,
+          uid: a
+        }))
       } catch {}
       l("briefing")
     }
@@ -15697,7 +15742,12 @@ Error generating stack: ` + e.message + `
     function b(M, z) {
       u(M), c(z);
       try {
-        sessionStorage.setItem("lcb_team", z)
+        sessionStorage.setItem("lcb_team", z);
+        localStorage.setItem("lcb_session", JSON.stringify({
+          code: M,
+          teamId: z,
+          uid: a
+        }))
       } catch {}
       l("briefing")
     }
@@ -15797,7 +15847,7 @@ Error generating stack: ` + e.message + `
           fontSize: 10,
           letterSpacing: 1
         },
-        children: "BUILD 2026-08-15-B \xB7 quick sim rest of match"
+        children: "BUILD 2026-08-15-C \xB7 resume in-progress game after disconnect"
       }), o === "connecting" && (0, f.jsx)("div", {
         style: {
           color: d.muted,

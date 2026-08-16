@@ -74,6 +74,15 @@ else
 fi
 
 echo ""
+echo "-- test_mp_resume.js --"
+if node tools/test_mp_resume.js; then
+  echo "PASS  test_mp_resume.js"
+else
+  echo "FAIL  test_mp_resume.js"
+  status=1
+fi
+
+echo ""
 if [ "$status" -eq 0 ]; then
   echo "== All checks passed =="
 else
